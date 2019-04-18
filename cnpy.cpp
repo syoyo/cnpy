@@ -59,12 +59,12 @@ template<> std::vector<char>& cnpy::operator+=(std::vector<char>& lhs, const cha
     return lhs;
 }
 
-void cnpy::parse_npy_header(unsigned char* buffer,size_t& word_size, std::vector<size_t>& shape, bool& fortran_order) {
+void cnpy::parse_npy_header(const unsigned char* buffer,size_t& word_size, std::vector<size_t>& shape, bool& fortran_order) {
     //std::string magic_string(buffer,6);
-    uint8_t major_version = *reinterpret_cast<uint8_t*>(buffer+6);
-    uint8_t minor_version = *reinterpret_cast<uint8_t*>(buffer+7);
-    uint16_t header_len = *reinterpret_cast<uint16_t*>(buffer+8);
-    std::string header(reinterpret_cast<char*>(buffer+9),header_len);
+    uint8_t major_version = *reinterpret_cast<const uint8_t*>(buffer+6);
+    uint8_t minor_version = *reinterpret_cast<const uint8_t*>(buffer+7);
+    uint16_t header_len = *reinterpret_cast<const uint16_t*>(buffer+8);
+    std::string header(reinterpret_cast<const char*>(buffer+9),header_len);
 
     size_t loc1, loc2;
 
@@ -185,6 +185,20 @@ cnpy::NpyArray load_the_npy_file(FILE* fp) {
     size_t nread = fread(arr.data<char>(),1,arr.num_bytes(),fp);
     if(nread != arr.num_bytes())
         throw std::runtime_error("load_the_npy_file: failed fread");
+    return arr;
+}
+
+cnpy::NpyArray load_the_npy_memory(const uint8_t *bytes, const size_t size) {
+    std::vector<size_t> shape;
+    size_t word_size;
+    bool fortran_order;
+    cnpy::parse_npy_header(reinterpret_cast<const unsigned char*>(bytes), word_size, shape, fortran_order);
+
+    cnpy::NpyArray arr(shape, word_size, fortran_order);
+
+    size_t offset = size - arr.num_bytes();
+    memcpy(arr.data<unsigned char>(),bytes + offset,arr.num_bytes());
+
     return arr;
 }
 
@@ -346,5 +360,14 @@ cnpy::NpyArray cnpy::npy_load(std::string fname) {
     return arr;
 }
 
+cnpy::NpyArray cnpy::npy_load(const uint8_t *bytes, const size_t size) {
+
+    if(!bytes) throw std::runtime_error("npy_load: Null pointer input");
+    if(size < 16) throw std::runtime_error("npy_load: Invalid buffer size");
+
+    NpyArray arr = load_the_npy_memory(bytes, size);
+
+    return arr;
+}
 
 
