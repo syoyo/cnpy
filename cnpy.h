@@ -13,7 +13,9 @@
 #include<typeinfo>
 #include<iostream>
 #include<cassert>
+#if defined(CNPY_WITH_ZLIB)
 #include<zlib.h>
+#endif
 #include<map>
 #include<memory>
 #include<stdint.h>
@@ -59,8 +61,8 @@ namespace cnpy {
         bool fortran_order;
         size_t num_vals;
     };
-   
-    using npz_t = std::map<std::string, NpyArray>; 
+
+    using npz_t = std::map<std::string, NpyArray>;
 
     char BigEndianTest();
     char map_type(const std::type_info& t);
@@ -75,7 +77,7 @@ namespace cnpy {
     template<typename T> std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
         //write in little endian
         for(size_t byte = 0; byte < sizeof(T); byte++) {
-            char val = *((char*)&rhs+byte); 
+            char val = *((char*)&rhs+byte);
             lhs.push_back(val);
         }
         return lhs;
@@ -132,6 +134,7 @@ namespace cnpy {
 
     template<typename T> void npz_save(std::string zipname, std::string fname, const T* data, const std::vector<size_t>& shape, std::string mode = "w")
     {
+#if CNPY_WITH_ZLIB
         //first, append a .npy to the fname
         fname += ".npy";
 
@@ -218,6 +221,9 @@ namespace cnpy {
         fwrite(&global_header[0],sizeof(char),global_header.size(),fp);
         fwrite(&footer[0],sizeof(char),footer.size(),fp);
         fclose(fp);
+#else
+        throw std::runtime_error("npz_save: This feture is not available since the library is not built with zlib support");
+#endif
     }
 
     template<typename T> void npy_save(std::string fname, const std::vector<T> data, std::string mode = "w") {
@@ -227,12 +233,16 @@ namespace cnpy {
     }
 
     template<typename T> void npz_save(std::string zipname, std::string fname, const std::vector<T> data, std::string mode = "w") {
+#if CNPY_WITH_ZLIB
         std::vector<size_t> shape;
         shape.push_back(data.size());
         npz_save(zipname, fname, &data[0], shape, mode);
+#else
+        throw std::runtime_error("npz_save: This feture is not available since the library is not built with zlib support");
+#endif
     }
 
-    template<typename T> std::vector<char> create_npy_header(const std::vector<size_t>& shape) {  
+    template<typename T> std::vector<char> create_npy_header(const std::vector<size_t>& shape) {
 
         std::vector<char> dict;
         dict += "{'descr': '";
